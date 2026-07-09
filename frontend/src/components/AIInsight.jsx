@@ -14,7 +14,7 @@ export default function AIInsight({ requestAI }) {
   };
 
   return (
-    <div className="card-flat p-5" data-testid="ai-insight-panel">
+    <div className="card-glass p-5" data-testid="ai-insight-panel">
       <div className="flex items-center justify-between mb-3">
         <span className="section-label flex items-center gap-2">
           <Sparkles className="w-3.5 h-3.5" /> AI Risk Insights

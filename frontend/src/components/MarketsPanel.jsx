@@ -5,8 +5,8 @@ import MarketsTable from "@/components/MarketsTable";
 /** Right column: markets table with header + refresh action. */
 export default function MarketsPanel({ markets, onRefresh, onSupply, onBorrow }) {
   return (
-    <div className="card-flat">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+    <div className="card-glass">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
         <span className="section-label flex items-center gap-2">
           <Activity className="w-3.5 h-3.5" /> Markets · Stellar Testnet
         </span>

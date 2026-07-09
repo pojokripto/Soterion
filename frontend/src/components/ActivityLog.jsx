@@ -13,8 +13,8 @@ const KIND_STYLE = {
 
 export default function ActivityLog({ activity }) {
   return (
-    <div className="card-flat" data-testid="activity-log">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+    <div className="card-glass" data-testid="activity-log">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
         <span className="section-label flex items-center gap-2">
           <Activity className="w-3.5 h-3.5" /> Activity Feed
         </span>

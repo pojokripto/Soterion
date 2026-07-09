@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { LineChart, Line } from "recharts";
 import { ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { AssetLogo } from "@/components/AssetLogos";
 
 export default function MarketsTable({ markets, onSupply, onBorrow }) {
   return (
@@ -41,7 +42,7 @@ function Row({ m, onSupply, onBorrow }) {
     <tr className="border-b border-border/60 hover:bg-white/[0.02] transition-colors" data-testid={`market-row-${m.symbol}`}>
       <td className="px-5 py-3">
         <div className="flex items-center gap-3">
-          <AssetIcon sym={m.symbol} />
+          <AssetLogo symbol={m.symbol} size={30} />
           <div>
             <div className="text-foreground font-semibold">{m.symbol}</div>
             <div className="text-[10px] text-muted-foreground sans">{m.name}</div>
@@ -94,23 +95,6 @@ function Row({ m, onSupply, onBorrow }) {
         </div>
       </td>
     </tr>
-  );
-}
-
-function AssetIcon({ sym }) {
-  const colors = {
-    XLM: "hsl(217, 91%, 60%)",
-    USDC: "hsl(210, 80%, 50%)",
-    AQUA: "hsl(180, 76%, 45%)",
-    yXLM: "hsl(268, 80%, 60%)",
-  };
-  return (
-    <div
-      className="w-7 h-7 rounded-full flex items-center justify-center mono text-[10px] font-bold text-black flex-shrink-0"
-      style={{ background: colors[sym] || "hsl(var(--foreground))" }}
-    >
-      {sym.slice(0, sym === "yXLM" ? 2 : 1)}
-    </div>
   );
 }
 

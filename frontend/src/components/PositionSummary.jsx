@@ -13,8 +13,8 @@ export default function PositionSummary({ position, markets, onWithdraw, onRepay
   const totalPaidUsd = Object.entries(interestPaid).reduce((s, [k, v]) => s + v * priceOf(k), 0);
 
   return (
-    <div className="card-flat" data-testid="position-summary">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+    <div className="card-glass" data-testid="position-summary">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
         <span className="section-label flex items-center gap-2">
           <Wallet className="w-3.5 h-3.5" /> Your Positions
         </span>

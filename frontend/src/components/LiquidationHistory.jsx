@@ -3,12 +3,14 @@ import { ShieldAlert } from "lucide-react";
 
 export default function LiquidationHistory({ items }) {
   return (
-    <div className="card-flat" data-testid="liquidation-history">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+    <div className="card-glass" data-testid="liquidation-history">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
         <span className="section-label flex items-center gap-2">
-          <ShieldAlert className="w-3.5 h-3.5" /> Liquidation History
+          <ShieldAlert className="w-3.5 h-3.5" /> Partial Liquidation History
         </span>
-        <span className="mono text-[10px] text-muted-foreground">auto-triggered partial liquidations</span>
+        <span className="status-pill status-pill--danger !text-[9.5px] !px-2.5 !py-1" data-testid="liq-badge">
+          <span className="dot" /> AUTO-TRIGGERED
+        </span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full mono text-[11.5px]">

@@ -26,17 +26,14 @@ export default function AutomationPanel({ position, onUpdate }) {
   const lastCheck = auto.last_check ? new Date(auto.last_check).toLocaleTimeString() : "—";
 
   return (
-    <div className="card-flat p-5" data-testid="automation-panel">
+    <div className="card-glass p-5" data-testid="automation-panel">
       <div className="flex items-center justify-between mb-4">
         <span className="section-label flex items-center gap-2">
           <Cpu className="w-3.5 h-3.5" /> Automation Engine
         </span>
-        <div className="flex items-center gap-2">
-          <span className={`badge ${enabled ? "badge-green" : ""}`}>
-            {enabled && <span className="w-1.5 h-1.5 rounded-full bg-terminal pulse-green" />}
-            {enabled ? "ACTIVE" : "PAUSED"}
-          </span>
-        </div>
+        <span className={`status-pill ${enabled ? "status-pill--safe" : "status-pill--info"}`} data-testid="automation-status">
+          <span className="dot" /> {enabled ? "ACTIVE" : "PAUSED"}
+        </span>
       </div>
 
       <div className="flex items-center justify-between py-2">

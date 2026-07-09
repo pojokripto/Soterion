@@ -1,15 +1,21 @@
 import React from "react";
 import { LogOut } from "lucide-react";
+import SoterionLogo from "@/components/SoterionLogo";
 
 /** Sticky top navigation for the authenticated dashboard. */
 export default function DashboardHeader({ wallet, onDisconnect }) {
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-background/70 backdrop-blur-2xl">
       <div className="max-w-[1440px] mx-auto px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-terminal pulse-green" />
-          <span className="mono text-[11px] tracking-[0.2em] text-muted-foreground uppercase">SOTERION</span>
-          <span className="mono text-[11px] text-terminal">/ v1.0 · stellar-testnet</span>
+        <div className="flex items-center gap-3">
+          <SoterionLogo size={28} dataTestId="header-logo" />
+          <div className="flex flex-col leading-tight">
+            <span className="font-semibold tracking-[-0.02em] text-[15px] text-foreground">Soterion</span>
+            <span className="mono text-[9.5px] tracking-[0.24em] text-muted-foreground uppercase">v1.0 · stellar</span>
+          </div>
+          <span className="ml-3 status-pill status-pill--safe" data-testid="network-status">
+            <span className="dot" /> live
+          </span>
         </div>
         <div className="flex items-center gap-3">
           <div className="hidden md:flex items-center gap-2 mono text-[11.5px]">

@@ -12,6 +12,7 @@ import PositionSummary from "@/components/PositionSummary";
 import ActivityLog from "@/components/ActivityLog";
 import LiquidationHistory from "@/components/LiquidationHistory";
 import TxModal from "@/components/TxModal";
+import ParallaxBackdrop from "@/components/ParallaxBackdrop";
 
 // Extracted constant to avoid re-creating on every render (react-perf lint).
 const TOAST_OPTIONS = {
@@ -29,6 +30,7 @@ export default function App() {
   if (!wallet) {
     return (
       <div className="App">
+        <ParallaxBackdrop />
         <Toaster theme="dark" position="bottom-right" toastOptions={TOAST_OPTIONS} />
         <Landing onConnect={connect} loading={loading} markets={markets} />
       </div>
@@ -42,10 +44,11 @@ export default function App() {
 
   return (
     <div className="App" data-testid="app-dashboard">
+      <ParallaxBackdrop />
       <Toaster theme="dark" position="bottom-right" toastOptions={TOAST_OPTIONS} />
       <DashboardHeader wallet={wallet} onDisconnect={disconnect} />
 
-      <main className="max-w-[1440px] mx-auto px-6 py-6 grid grid-cols-12 gap-4">
+      <main className="max-w-[1440px] mx-auto px-6 py-6 grid grid-cols-12 gap-4 relative z-10">
         <section className="col-span-12 lg:col-span-4 flex flex-col gap-4">
           <HFCard position={position} hfFlash={hfFlash} />
           <AutomationPanel position={position} onUpdate={updateAutomation} />

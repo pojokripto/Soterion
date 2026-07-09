@@ -32,7 +32,7 @@ function flashClass(flash) {
 // Framer Motion config — extracted so props don't allocate every render.
 const NEEDLE_TRANSITION = { type: "spring", stiffness: 90, damping: 14 };
 
-export default function HealthGauge({ hf, trigger = 1.15, flash }) {
+export default function HealthGauge({ hf, trigger = 1.15, flash, neonClass = "" }) {
   const value = hf == null ? 2.5 : Math.min(hf, 2.5);
   const noDebt = hf == null;
 
@@ -123,7 +123,7 @@ export default function HealthGauge({ hf, trigger = 1.15, flash }) {
       </svg>
 
       <div className="flex flex-col items-center -mt-6">
-        <div className={`mono text-[42px] font-semibold leading-none ${flashClass(flash)}`} data-testid="hf-value">
+        <div className={`mono text-[42px] font-semibold leading-none ${flashClass(flash)} ${neonClass}`} data-testid="hf-value">
           {noDebt ? "∞" : display.toFixed(3)}
         </div>
         <div className="mt-1 mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">Health Factor</div>
