@@ -226,64 +226,73 @@ async def log_activity(wallet: str, kind: str, message: str, meta: Optional[Dict
     await db.activity.insert_one(entry)
 
 
-def _accrue_interest(user: Dict[str, Any]) -> Dict[str, Dict[str, float]]:
-    """
-    Continuously compound interest on supplied (earn) and borrowed (owe) positions.
-    A = P · e^(r · Δt_years)
-
-    Mutates user in place and returns the interest deltas this call generated.
-    """
-    now = datetime.now(timezone.utc)
-    last_str = user.get("last_accrual_ts")
+def _parse_last_ts(user: Dict[str, Any], fallback: datetime) -> datetime:
+    """Return a tz-aware datetime from the user's `last_accrual_ts`, defaulting to *fallback*."""
+    raw = user.get("last_accrual_ts")
     try:
-        last = datetime.fromisoformat(last_str) if last_str else now
+        parsed = datetime.fromisoformat(raw) if raw else fallback
     except ValueError:
-        last = now
-    if last.tzinfo is None:
-        last = last.replace(tzinfo=timezone.utc)
+        parsed = fallback
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
 
+
+def _accrue_side(
+    positions: Dict[str, float],
+    total_field: str,
+    apy_field: str,
+    ledger: Dict[str, float],
+    dt_years: float,
+) -> Dict[str, float]:
+    """
+    Grow every non-zero position by continuous compounding: A = P · e^(r·Δt_years).
+    Also updates the market's aggregate `total_field` and the user's cumulative `ledger`.
+    Returns the per-asset delta accrued in this call.
+    """
+    deltas: Dict[str, float] = {}
+    for asset, amt in list(positions.items()):
+        info = ASSETS.get(asset)
+        if not info or amt <= 0:
+            continue
+        rate = info[apy_field] / 100.0
+        new_amt = amt * math.exp(rate * dt_years)
+        gained = new_amt - amt
+        if gained <= 0:
+            continue
+        positions[asset] = new_amt
+        ledger[asset] = ledger.get(asset, 0.0) + gained
+        info[total_field] += gained
+        deltas[asset] = gained
+    return deltas
+
+
+def _accrue_interest(user: Dict[str, Any]) -> Dict[str, Dict[str, float]]:
+    """Continuously compound interest on supplied (earn) & borrowed (owe) positions in-place."""
+    now = datetime.now(timezone.utc)
+    last = _parse_last_ts(user, now)
     dt_seconds = max(0.0, (now - last).total_seconds())
+    user["last_accrual_ts"] = now.isoformat()
+
     if dt_seconds <= 0:
-        user["last_accrual_ts"] = now.isoformat()
         return {"earned": {}, "paid": {}}
 
     dt_years = dt_seconds / SECONDS_PER_YEAR
-    earned_delta: Dict[str, float] = {}
-    paid_delta: Dict[str, float] = {}
-
-    supplied = user.setdefault("supplied", {})
-    borrowed = user.setdefault("borrowed", {})
-    interest_earned = user.setdefault("interest_earned", {})
-    interest_paid = user.setdefault("interest_paid", {})
-
-    for asset, amt in list(supplied.items()):
-        info = ASSETS.get(asset)
-        if not info or amt <= 0:
-            continue
-        r = info["supply_apy"] / 100.0
-        new_amt = amt * math.exp(r * dt_years)
-        gained = new_amt - amt
-        supplied[asset] = new_amt
-        if gained > 0:
-            interest_earned[asset] = interest_earned.get(asset, 0.0) + gained
-            earned_delta[asset] = gained
-            info["total_supplied"] += gained
-
-    for asset, amt in list(borrowed.items()):
-        info = ASSETS.get(asset)
-        if not info or amt <= 0:
-            continue
-        r = info["borrow_apy"] / 100.0
-        new_amt = amt * math.exp(r * dt_years)
-        owed = new_amt - amt
-        borrowed[asset] = new_amt
-        if owed > 0:
-            interest_paid[asset] = interest_paid.get(asset, 0.0) + owed
-            paid_delta[asset] = owed
-            info["total_borrowed"] += owed
-
-    user["last_accrual_ts"] = now.isoformat()
-    return {"earned": earned_delta, "paid": paid_delta}
+    earned = _accrue_side(
+        user.setdefault("supplied", {}),
+        total_field="total_supplied",
+        apy_field="supply_apy",
+        ledger=user.setdefault("interest_earned", {}),
+        dt_years=dt_years,
+    )
+    paid = _accrue_side(
+        user.setdefault("borrowed", {}),
+        total_field="total_borrowed",
+        apy_field="borrow_apy",
+        ledger=user.setdefault("interest_paid", {}),
+        dt_years=dt_years,
+    )
+    return {"earned": earned, "paid": paid}
 
 
 def _sum_collateral(positions: Dict[str, float]) -> tuple[float, float]:
@@ -556,40 +565,51 @@ async def get_liquidations(wallet: str, limit: int = 50):
     return {"liquidations": docs}
 
 
-async def execute_partial_liquidation(user: Dict[str, Any], reason: str) -> Optional[Dict[str, Any]]:
-    """Automatically execute a partial liquidation on the largest debt position."""
-    borrowed = user.get("borrowed", {}) or {}
-    supplied = user.get("supplied", {}) or {}
-    if not borrowed or not supplied:
-        return None
-    # largest debt in USD
-    debt_pairs = sorted(
-        ((a, amt * ASSETS[a]["price"]) for a, amt in borrowed.items() if amt > 0),
-        key=lambda x: -x[1],
-    )
-    coll_pairs = sorted(
-        ((a, amt * ASSETS[a]["price"]) for a, amt in supplied.items() if amt > 0),
-        key=lambda x: -x[1],
-    )
-    if not debt_pairs or not coll_pairs:
-        return None
+def _largest_position(positions: Dict[str, float]) -> Optional[tuple[str, float]]:
+    """Return (asset, usd_value) of the largest position, or None if empty."""
+    best: Optional[tuple[str, float]] = None
+    for asset, amt in positions.items():
+        info = ASSETS.get(asset)
+        if not info or amt <= 0:
+            continue
+        usd = amt * info["price"]
+        if best is None or usd > best[1]:
+            best = (asset, usd)
+    return best
 
-    debt_asset, debt_usd = debt_pairs[0]
-    coll_asset, _ = coll_pairs[0]
-    max_pct = user["automation"].get("max_liquidation_pct", 0.35)
 
-    repay_usd = debt_usd * max_pct
-    repay_amt = repay_usd / ASSETS[debt_asset]["price"]
-    # seize collateral (with liquidation bonus)
-    bonus = ASSETS[coll_asset]["liquidation_bonus"]
-    seize_usd = repay_usd * (1 + bonus)
-    seize_amt = seize_usd / ASSETS[coll_asset]["price"]
-    seize_amt = min(seize_amt, user["supplied"][coll_asset])
-
+def _apply_liquidation(
+    user: Dict[str, Any],
+    debt_asset: str,
+    coll_asset: str,
+    repay_amt: float,
+    seize_amt: float,
+) -> None:
+    """Mutate user + market state to reflect a partial liquidation."""
     user["borrowed"][debt_asset] = max(0.0, user["borrowed"][debt_asset] - repay_amt)
     user["supplied"][coll_asset] = max(0.0, user["supplied"][coll_asset] - seize_amt)
     ASSETS[debt_asset]["total_borrowed"] = max(0.0, ASSETS[debt_asset]["total_borrowed"] - repay_amt)
     ASSETS[coll_asset]["total_supplied"] = max(0.0, ASSETS[coll_asset]["total_supplied"] - seize_amt)
+
+
+async def execute_partial_liquidation(user: Dict[str, Any], reason: str) -> Optional[Dict[str, Any]]:
+    """Automatically execute a partial liquidation on the largest debt vs largest collateral."""
+    debt = _largest_position(user.get("borrowed") or {})
+    coll = _largest_position(user.get("supplied") or {})
+    if not debt or not coll:
+        return None
+
+    debt_asset, debt_usd = debt
+    coll_asset, _ = coll
+    max_pct = user["automation"].get("max_liquidation_pct", 0.35)
+    bonus = ASSETS[coll_asset]["liquidation_bonus"]
+
+    repay_usd = debt_usd * max_pct
+    repay_amt = repay_usd / ASSETS[debt_asset]["price"]
+    seize_usd = repay_usd * (1 + bonus)
+    seize_amt = min(seize_usd / ASSETS[coll_asset]["price"], user["supplied"][coll_asset])
+
+    _apply_liquidation(user, debt_asset, coll_asset, repay_amt, seize_amt)
 
     event = {
         "id": str(uuid.uuid4()),
@@ -613,47 +633,63 @@ async def execute_partial_liquidation(user: Dict[str, Any], reason: str) -> Opti
     return event
 
 
-async def automation_worker():
-    """Runs every 6 seconds. Also drifts prices to simulate live Stellar feeds."""
+def _drift_market_prices() -> None:
+    """Random-walk prices ±0.6% and re-derive APYs from utilisation."""
+    for sym, a in ASSETS.items():
+        drift = 1 + random.uniform(-0.006, 0.006)
+        a["price"] = round(max(0.000001, a["price"] * drift), 6)
+        PRICE_HISTORY[sym].append(a["price"])
+        if len(PRICE_HISTORY[sym]) > 60:
+            PRICE_HISTORY[sym] = PRICE_HISTORY[sym][-60:]
+        util = utilization(a)
+        a["borrow_apy"] = round(max(1.0, a["borrow_apy"] * (1 + (util - 0.5) * 0.001)), 3)
+        a["supply_apy"] = round(a["borrow_apy"] * util * 0.85, 3)
+
+
+async def _refresh_real_prices_if_due(tick: int) -> None:
+    """Pull real XLM/USDC close from Stellar Horizon every 5 ticks (~30s)."""
+    if tick % 5 != 0:
+        return
+    real = await fetch_xlm_price_from_stellar()
+    if real and real > 0:
+        ASSETS["XLM"]["price"] = round(real, 6)
+        ASSETS["yXLM"]["price"] = round(real * 1.026, 6)
+
+
+async def _maybe_liquidate(user: Dict[str, Any], now_iso: str) -> None:
+    """If the user's automation is enabled and HF has crossed the trigger, liquidate."""
+    automation = user.get("automation") or {}
+    if not automation.get("enabled"):
+        return
+    user["automation"]["last_check"] = now_iso
+    hf = compute_health_factor(user)["health_factor"]
+    trigger = automation.get("trigger_hf", 1.15)
+    if hf is None or hf > trigger:
+        return
+    reason = f"HF={hf:.3f} ≤ trigger={trigger:.3f}"
+    logger.info("[automation] liquidating %s :: %s", user["wallet"][:10], reason)
+    await execute_partial_liquidation(user, reason)
+
+
+async def _tick_users(now_iso: str) -> None:
+    """Load every user, accrue interest, optionally liquidate, persist."""
+    users = await db.users.find({}, {"_id": 0}).to_list(1000)
+    for user in users:
+        _accrue_interest(user)
+        await _maybe_liquidate(user, now_iso)
+        await save_user(user)
+
+
+async def automation_worker() -> None:
+    """Runs every 6 seconds — drifts prices, accrues interest, triggers liquidations."""
     logger.info("[automation] worker started")
     tick = 0
     while True:
         try:
             tick += 1
-            # Drift prices ±0.6%
-            for sym, a in ASSETS.items():
-                drift = 1 + random.uniform(-0.006, 0.006)
-                a["price"] = round(max(0.000001, a["price"] * drift), 6)
-                PRICE_HISTORY[sym].append(a["price"])
-                if len(PRICE_HISTORY[sym]) > 60:
-                    PRICE_HISTORY[sym] = PRICE_HISTORY[sym][-60:]
-                # Utilization impacts APYs slightly
-                u = utilization(a)
-                a["borrow_apy"] = round(max(1.0, a["borrow_apy"] * (1 + (u - 0.5) * 0.001)), 3)
-                a["supply_apy"] = round(a["borrow_apy"] * u * 0.85, 3)
-
-            # Every 5 ticks (~30s) try real XLM price
-            if tick % 5 == 0:
-                real = await fetch_xlm_price_from_stellar()
-                if real and real > 0:
-                    ASSETS["XLM"]["price"] = round(real, 6)
-                    ASSETS["yXLM"]["price"] = round(real * 1.026, 6)
-
-            # Accrue interest for ALL users, and run automation for those enabled.
-            users = await db.users.find({}, {"_id": 0}).to_list(1000)
-            now_iso = datetime.now(timezone.utc).isoformat()
-            for u in users:
-                _accrue_interest(u)
-                automation = u.get("automation") or {}
-                if automation.get("enabled"):
-                    u["automation"]["last_check"] = now_iso
-                    hf = compute_health_factor(u)["health_factor"]
-                    trigger = automation.get("trigger_hf", 1.15)
-                    if hf is not None and hf <= trigger:
-                        reason = f"HF={hf:.3f} ≤ trigger={trigger:.3f}"
-                        logger.info("[automation] liquidating %s :: %s", u["wallet"][:10], reason)
-                        await execute_partial_liquidation(u, reason)
-                await save_user(u)
+            _drift_market_prices()
+            await _refresh_real_prices_if_due(tick)
+            await _tick_users(datetime.now(timezone.utc).isoformat())
         except Exception as exc:  # noqa: BLE001
             logger.exception("[automation] tick error: %s", exc)
         await asyncio.sleep(6)

@@ -9,6 +9,29 @@ import { motion } from "framer-motion";
  *   <= 1.25 warning (amber)
  *   >  1.25 safe (green)
  */
+/** Zone thresholds mapped once to avoid nested ternaries in the render body. */
+const ZONES = [
+  { max: 1.0, label: "LIQUIDATABLE", badge: "badge-red" },
+  { max: 1.15, label: "DANGER", badge: "badge-red" },
+  { max: 1.5, label: "WARNING", badge: "badge-amber" },
+  { max: Infinity, label: "SAFE", badge: "badge-green" },
+];
+
+function classifyZone(hf, noDebt) {
+  if (noDebt) return ZONES[ZONES.length - 1];
+  if (hf == null) return { label: "—", badge: "badge-red" };
+  return ZONES.find((z) => hf <= z.max) ?? ZONES[ZONES.length - 1];
+}
+
+function flashClass(flash) {
+  if (flash === "up") return "flash-up";
+  if (flash === "down") return "flash-down";
+  return "";
+}
+
+// Framer Motion config — extracted so props don't allocate every render.
+const NEEDLE_TRANSITION = { type: "spring", stiffness: 90, damping: 14 };
+
 export default function HealthGauge({ hf, trigger = 1.15, flash }) {
   const value = hf == null ? 2.5 : Math.min(hf, 2.5);
   const noDebt = hf == null;
@@ -61,9 +84,11 @@ export default function HealthGauge({ hf, trigger = 1.15, flash }) {
     return () => cancelAnimationFrame(raf);
   }, [value, noDebt]);
 
-  const hfLabel = noDebt ? "∞" : (hf != null ? hf.toFixed(3) : "—");
-  const zone = noDebt ? "SAFE" : (hf == null ? "—" : hf <= 1.0 ? "LIQUIDATABLE" : hf <= 1.15 ? "DANGER" : hf <= 1.5 ? "WARNING" : "SAFE");
-  const zoneClass = zone === "SAFE" ? "badge-green" : zone === "WARNING" ? "badge-amber" : "badge-red";
+  const zoneInfo = classifyZone(hf, noDebt);
+  const zone = zoneInfo.label;
+  const zoneClass = zoneInfo.badge;
+  const needleStyle = { originX: `${cx}px`, originY: `${cy}px`, transformBox: "fill-box" };
+  const needleAnimate = { rotate: noDebt ? 90 : needleAngle };
 
   return (
     <div className="flex flex-col items-center" data-testid="health-gauge">
@@ -83,11 +108,7 @@ export default function HealthGauge({ hf, trigger = 1.15, flash }) {
         <TickMarker cx={cx} cy={cy} r={r} angle={triggerAngle} color="hsl(var(--steel-blue))" label={`trigger ${trigger.toFixed(2)}`} />
 
         {/* Needle */}
-        <motion.g
-          animate={{ rotate: noDebt ? 90 : needleAngle }}
-          transition={{ type: "spring", stiffness: 90, damping: 14 }}
-          style={{ originX: `${cx}px`, originY: `${cy}px`, transformBox: "fill-box" }}
-        >
+        <motion.g animate={needleAnimate} transition={NEEDLE_TRANSITION} style={needleStyle}>
           <line
             x1={cx}
             y1={cy}
@@ -102,7 +123,7 @@ export default function HealthGauge({ hf, trigger = 1.15, flash }) {
       </svg>
 
       <div className="flex flex-col items-center -mt-6">
-        <div className={`mono text-[42px] font-semibold leading-none ${flash === "up" ? "flash-up" : flash === "down" ? "flash-down" : ""}`} data-testid="hf-value">
+        <div className={`mono text-[42px] font-semibold leading-none ${flashClass(flash)}`} data-testid="hf-value">
           {noDebt ? "∞" : display.toFixed(3)}
         </div>
         <div className="mt-1 mono text-[10px] tracking-[0.2em] text-muted-foreground uppercase">Health Factor</div>
