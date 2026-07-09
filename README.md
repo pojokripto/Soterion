@@ -240,6 +240,6 @@ MIT — build on it, extend it, adapt it. If you ship something interesting on S
 
 **Soterion** — because your position deserves a guardian, not a graveyard.
 
-<sub>Built on the FARM stack for Stellar · Powered by Emergent</sub>
+<sub>Built on the FARM stack for Stellar · Soterion </sub>
 
 </div>
