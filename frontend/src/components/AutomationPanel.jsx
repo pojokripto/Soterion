@@ -1,0 +1,113 @@
+import React, { useEffect, useState } from "react";
+import { Cpu, Zap } from "lucide-react";
+
+export default function AutomationPanel({ position, onUpdate }) {
+  const auto = position?.automation ?? { enabled: false, trigger_hf: 1.15, max_liquidation_pct: 0.35 };
+  const [enabled, setEnabled] = useState(auto.enabled);
+  const [trigger, setTrigger] = useState(auto.trigger_hf);
+  const [maxPct, setMaxPct] = useState(auto.max_liquidation_pct);
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    setEnabled(auto.enabled);
+    setTrigger(auto.trigger_hf);
+    setMaxPct(auto.max_liquidation_pct);
+    setDirty(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auto.enabled, auto.trigger_hf, auto.max_liquidation_pct]);
+
+  const dirtyFlag = () => setDirty(true);
+
+  const apply = () => {
+    onUpdate({ enabled, trigger_hf: Number(trigger), max_liquidation_pct: Number(maxPct) });
+    setDirty(false);
+  };
+
+  const lastCheck = auto.last_check ? new Date(auto.last_check).toLocaleTimeString() : "—";
+
+  return (
+    <div className="card-flat p-5" data-testid="automation-panel">
+      <div className="flex items-center justify-between mb-4">
+        <span className="section-label flex items-center gap-2">
+          <Cpu className="w-3.5 h-3.5" /> Automation Engine
+        </span>
+        <div className="flex items-center gap-2">
+          <span className={`badge ${enabled ? "badge-green" : ""}`}>
+            {enabled && <span className="w-1.5 h-1.5 rounded-full bg-terminal pulse-green" />}
+            {enabled ? "ACTIVE" : "PAUSED"}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between py-2">
+        <div>
+          <div className="text-sm text-foreground">Auto Partial Liquidation</div>
+          <div className="text-[11px] text-muted-foreground mt-0.5">
+            Worker monitors HF every 6s. Executes on-chain when HF ≤ trigger.
+          </div>
+        </div>
+        <div
+          className={`toggle ${enabled ? "on" : ""}`}
+          data-testid="automation-toggle"
+          role="switch"
+          aria-checked={enabled}
+          onClick={() => { setEnabled(!enabled); dirtyFlag(); }}
+        />
+      </div>
+
+      <div className="mt-4 space-y-4">
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <span className="section-label text-[10px]">Trigger HF</span>
+            <span className="mono text-[12px] text-steel" data-testid="trigger-value">{Number(trigger).toFixed(2)}</span>
+          </div>
+          <input
+            type="range"
+            min="1.00"
+            max="2.00"
+            step="0.01"
+            value={trigger}
+            onChange={(e) => { setTrigger(parseFloat(e.target.value)); dirtyFlag(); }}
+            className="slider"
+            data-testid="trigger-slider"
+          />
+          <div className="flex justify-between mono text-[9px] text-muted-foreground mt-1">
+            <span>1.00 liquidatable</span>
+            <span>2.00 safe</span>
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <span className="section-label text-[10px]">Max Cut per Trigger</span>
+            <span className="mono text-[12px] text-amber" data-testid="max-pct-value">{Math.round(maxPct * 100)}%</span>
+          </div>
+          <input
+            type="range"
+            min="0.05"
+            max="0.75"
+            step="0.05"
+            value={maxPct}
+            onChange={(e) => { setMaxPct(parseFloat(e.target.value)); dirtyFlag(); }}
+            className="slider"
+            data-testid="maxpct-slider"
+          />
+        </div>
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
+        <div className="mono text-[10.5px] text-muted-foreground">
+          last check <span className="text-foreground">{lastCheck}</span>
+        </div>
+        <button
+          className="btn-primary flex items-center gap-1.5"
+          disabled={!dirty}
+          onClick={apply}
+          data-testid="automation-apply"
+        >
+          <Zap className="w-3 h-3" /> Apply
+        </button>
+      </div>
+    </div>
+  );
+}
