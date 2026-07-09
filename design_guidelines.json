@@ -1,0 +1,109 @@
+{
+  "project_name": "Soterion",
+  "app_type": "hybrid_fullstack",
+  "theme_strategy": "Dark mode strictly enforced. Aesthetic: Dark Cyber Finance / Terminal Brutalism. Inspired by Bloomberg terminals and modern IDEs. NO purple gradients.",
+  "typography": {
+    "headings": "Instrument Sans, sans-serif",
+    "body": "Instrument Sans, sans-serif",
+    "data_and_numbers": "JetBrains Mono, monospace",
+    "rules": {
+      "scale": "Strict adherence to Tailwind scales. Headings tight tracking (-0.02em).",
+      "data": "All financial numbers, APYs, balances, and addresses MUST use the monospace font for tabular alignment.",
+      "imports": [
+        "@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');"
+      ]
+    }
+  },
+  "colors": {
+    "palette": {
+      "background": "#050505",
+      "surface_card": "#0C0C0C",
+      "surface_elevated": "#141414",
+      "border_default": "#222222",
+      "border_focus": "#3B82F6",
+      "text_primary": "#F3F4F6",
+      "text_secondary": "#9CA3AF",
+      "text_muted": "#6B7280",
+      "terminal_green": "#10B981",
+      "amber_warning": "#F59E0B",
+      "critical_red": "#EF4444",
+      "steel_blue": "#3B82F6"
+    },
+    "semantic": {
+      "health_safe": "terminal_green",
+      "health_warning": "amber_warning",
+      "health_danger": "critical_red",
+      "button_primary_bg": "steel_blue",
+      "button_primary_text": "#FFFFFF",
+      "card_bg": "surface_card"
+    }
+  },
+  "visual_enhancers": {
+    "textures": "Apply a subtle CSS-based SVG noise/grain overlay across the app background to kill digital flatness.",
+    "patterns": "Use CSS linear-gradient scan-lines or a very faint 1px grid background (`background-image: linear-gradient(to right, #222 1px, transparent 1px), linear-gradient(to bottom, #222 1px, transparent 1px); background-size: 40px 40px;`) on the hero or wrapper.",
+    "borders": "Expose the skeleton. Use 1px sharp borders. Avoid soft, diffuse shadows. Prefer hard inner strokes or glowing 1px box-shadows on active states.",
+    "glassmorphism": "Only for sticky headers or modals. Must use deep black background (`bg-black/80`) with heavy blur (`backdrop-blur-2xl`) and a 1px solid top border. NEVER pure transparent."
+  },
+  "grids_layouts": {
+    "philosophy": "High Density, Data Correlation, Scanability.",
+    "bento_grid": "Dashboard uses a dense Bento grid structure (`gap-4` or `gap-1px` with `border-collapse` style for a technical look).",
+    "cards": "Cardless or flat cards with sharp edges (`rounded-sm` max) and 1px border. No floating soft shadows.",
+    "spacing": "Dense internal padding for widgets (`p-4` or `p-5`), generous margins between core sections (`py-12`)."
+  },
+  "component_rules": {
+    "health_factor_gauge": {
+      "description": "The CENTERPIECE. A highly visual semi-circle or radial gauge.",
+      "details": "Must feature colored zones (Safe: Green, Warning: Amber, Danger: Red). Include an interactive slider/marker natively inside or right below the gauge for the 'Automation Trigger Point'. Use bold JetBrains Mono for the score in the center."
+    },
+    "automation_engine_card": {
+      "description": "Control center for partial liquidation.",
+      "details": "Include a robust toggle switch. When active, apply a 'Tracing Beam' or subtle pulsing terminal green dot. Log activity in a terminal-like window inside the card (black bg, monospace green text)."
+    },
+    "lending_pool_dashboard": {
+      "description": "Market data for XLM, USDC, AQUA, yXLM.",
+      "details": "Use a data table or dense list. Align numbers strictly to the right. Use Recharts for mini sparklines/price tickers next to the asset names."
+    },
+    "ai_risk_insights": {
+      "description": "LLM generated narratives.",
+      "details": "Style like a retro-futuristic terminal feed or a Bloomberg chat window. Monospace text for volatility warnings."
+    },
+    "buttons": {
+      "description": "Action triggers.",
+      "details": "Sharp edges (`rounded-sm`). Default to 1px borders with transparent bg for secondary. On hover, invert background and text colors (Terminal style). Use Steel Blue for primary positive actions."
+    }
+  },
+  "motion": {
+    "micro_interactions": "Hover states must feel instant but smooth (150ms).",
+    "health_gauge": "Animate the gauge fill from 0 to current value on load.",
+    "data_tickers": "Highlight numbers briefly with a green/red flash when they 'update' to simulate real-time Stellar network feeds."
+  },
+  "accessibility": {
+    "contrast": "Ensure all text, especially terminal green/amber on dark backgrounds, passes APCA/WCAG standards.",
+    "data_testid": "CRITICAL: Every interactive element (buttons, toggles, form inputs, list items) MUST have a `data-testid` attribute (e.g., `data-testid='automation-toggle'`)."
+  },
+  "media": {
+    "icons": "Use `lucide-react`. Prefer crisp, technical icons (Terminal, Activity, ShieldAlert, Cpu).",
+    "images": "Avoid generic stock photography. Rely on typography, grid structures, and data visualizations (charts/gauges) to provide visual interest."
+  },
+  "3d_libraries": {
+    "charts": "Use `recharts` for all standard graphs (mini price tickers, utilization bars).",
+    "gauge": "Build the Health Gauge using SVG primitives + framer-motion, or customize a recharts RadialBarChart to look like a precise instrument."
+  },
+  "instructions_to_main_agent": [
+    "Wipe default Tailwind styles and implement the dark cyber finance color palette exactly as specified in the colors section.",
+    "Import Instrument Sans and JetBrains Mono fonts via Google Fonts in index.css.",
+    "Ensure `data-testid` is added to EVERY button, modal trigger, toggle, and significant data container.",
+    "Build the dashboard using a dense, technical grid layout. Avoid excessive whitespace inside data cards; make it feel like a pro trading terminal.",
+    "The Health Factor Gauge must be visually prominent. Prioritize its development and styling.",
+    "For the Automation Engine activity log, create a component that looks like a command-line interface (CLI).",
+    "Implement Sonner for toast notifications (e.g., transaction status updates) positioned at bottom-right."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Do not converge towards generic 'AI slop'. The UI must feel distinct, sharp, and highly technical.",
+    "Never apply `transition: all`. Use targeted transitions (e.g., `transition-colors`, `transition-transform`).",
+    "Do not center-align app containers (`.App { text-align: center; }` is forbidden). Left-align dense data.",
+    "Create depth through 1px borders and nested containers rather than soft drop-shadows.",
+    "Never use purely transparent backgrounds for overlays, dropdowns, or sticky headers. Always use `bg-background/90` with `backdrop-blur`.",
+    "Missing data must have skeleton loaders, not empty voids."
+  ]
+}
