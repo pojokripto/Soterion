@@ -103,6 +103,9 @@ ASSETS: Dict[str, Dict[str, Any]] = {
 # Price history for sparklines: dict[symbol -> list of last 30 prices]
 PRICE_HISTORY: Dict[str, List[float]] = {s: [ASSETS[s]["price"]] * 30 for s in ASSETS}
 
+# Interest math (continuous compounding).
+SECONDS_PER_YEAR = 365.25 * 24 * 3600
+
 
 async def fetch_xlm_price_from_stellar() -> Optional[float]:
     """Pull the latest XLM/USD trade price from Stellar Horizon (public testnet fallback → mainnet)."""
@@ -174,18 +177,27 @@ async def get_or_create_user(wallet: str) -> Dict[str, Any]:
     wallet = _wallet_id(wallet)
     user = await db.users.find_one({"wallet": wallet}, {"_id": 0})
     if user:
+        # Migrate older documents that predate interest accrual.
+        if "last_accrual_ts" not in user:
+            user["last_accrual_ts"] = datetime.now(timezone.utc).isoformat()
+            user.setdefault("interest_earned", {})
+            user.setdefault("interest_paid", {})
         return user
+    now_iso = datetime.now(timezone.utc).isoformat()
     user = {
         "wallet": wallet,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": now_iso,
+        "last_accrual_ts": now_iso,
         "balances": {
             "XLM": 5000.0,
             "USDC": 2500.0,
             "AQUA": 250000.0,
             "yXLM": 1000.0,
         },
-        "supplied": {},   # asset -> amount
-        "borrowed": {},   # asset -> amount
+        "supplied": {},   # asset -> amount (accrues supply APY)
+        "borrowed": {},   # asset -> amount (accrues borrow APY)
+        "interest_earned": {},  # asset -> cumulative interest earned since inception
+        "interest_paid": {},    # asset -> cumulative interest paid since inception
         "automation": {
             "enabled": False,
             "trigger_hf": 1.15,
@@ -212,6 +224,66 @@ async def log_activity(wallet: str, kind: str, message: str, meta: Optional[Dict
         "ts": datetime.now(timezone.utc).isoformat(),
     }
     await db.activity.insert_one(entry)
+
+
+def _accrue_interest(user: Dict[str, Any]) -> Dict[str, Dict[str, float]]:
+    """
+    Continuously compound interest on supplied (earn) and borrowed (owe) positions.
+    A = P · e^(r · Δt_years)
+
+    Mutates user in place and returns the interest deltas this call generated.
+    """
+    now = datetime.now(timezone.utc)
+    last_str = user.get("last_accrual_ts")
+    try:
+        last = datetime.fromisoformat(last_str) if last_str else now
+    except ValueError:
+        last = now
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+
+    dt_seconds = max(0.0, (now - last).total_seconds())
+    if dt_seconds <= 0:
+        user["last_accrual_ts"] = now.isoformat()
+        return {"earned": {}, "paid": {}}
+
+    dt_years = dt_seconds / SECONDS_PER_YEAR
+    earned_delta: Dict[str, float] = {}
+    paid_delta: Dict[str, float] = {}
+
+    supplied = user.setdefault("supplied", {})
+    borrowed = user.setdefault("borrowed", {})
+    interest_earned = user.setdefault("interest_earned", {})
+    interest_paid = user.setdefault("interest_paid", {})
+
+    for asset, amt in list(supplied.items()):
+        info = ASSETS.get(asset)
+        if not info or amt <= 0:
+            continue
+        r = info["supply_apy"] / 100.0
+        new_amt = amt * math.exp(r * dt_years)
+        gained = new_amt - amt
+        supplied[asset] = new_amt
+        if gained > 0:
+            interest_earned[asset] = interest_earned.get(asset, 0.0) + gained
+            earned_delta[asset] = gained
+            info["total_supplied"] += gained
+
+    for asset, amt in list(borrowed.items()):
+        info = ASSETS.get(asset)
+        if not info or amt <= 0:
+            continue
+        r = info["borrow_apy"] / 100.0
+        new_amt = amt * math.exp(r * dt_years)
+        owed = new_amt - amt
+        borrowed[asset] = new_amt
+        if owed > 0:
+            interest_paid[asset] = interest_paid.get(asset, 0.0) + owed
+            paid_delta[asset] = owed
+            info["total_borrowed"] += owed
+
+    user["last_accrual_ts"] = now.isoformat()
+    return {"earned": earned_delta, "paid": paid_delta}
 
 
 def _sum_collateral(positions: Dict[str, float]) -> tuple[float, float]:
@@ -273,9 +345,21 @@ def serialize_user(user: Dict[str, Any]) -> Dict[str, Any]:
         "balances": user.get("balances", {}),
         "supplied": user.get("supplied", {}),
         "borrowed": user.get("borrowed", {}),
+        "interest_earned": user.get("interest_earned", {}),
+        "interest_paid": user.get("interest_paid", {}),
+        "last_accrual_ts": user.get("last_accrual_ts"),
         "automation": user.get("automation", {}),
         **hf,
     }
+
+
+async def load_user_with_accrual(wallet: str, persist: bool = True) -> Dict[str, Any]:
+    """Load user, apply interest accrual, and (optionally) persist the result."""
+    user = await get_or_create_user(wallet)
+    _accrue_interest(user)
+    if persist:
+        await save_user(user)
+    return user
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -316,7 +400,7 @@ async def connect_wallet(req: ConnectWalletRequest):
 
 @api_router.get("/position/{wallet}")
 async def get_position(wallet: str):
-    user = await get_or_create_user(wallet)
+    user = await load_user_with_accrual(wallet)
     return serialize_user(user)
 
 
@@ -335,7 +419,7 @@ async def supply(req: TxRequest):
     info = _validate_asset(req.asset)
     if req.amount <= 0:
         raise HTTPException(400, "Amount must be positive")
-    user = await get_or_create_user(req.wallet)
+    user = await load_user_with_accrual(req.wallet, persist=False)
     bal = user["balances"].get(req.asset, 0.0)
     if bal < req.amount:
         raise HTTPException(400, f"Insufficient {req.asset} balance")
@@ -356,7 +440,7 @@ async def withdraw(req: TxRequest):
     info = _validate_asset(req.asset)
     if req.amount <= 0:
         raise HTTPException(400, "Amount must be positive")
-    user = await get_or_create_user(req.wallet)
+    user = await load_user_with_accrual(req.wallet, persist=False)
     supplied = user["supplied"].get(req.asset, 0.0)
     if supplied < req.amount:
         raise HTTPException(400, f"Not enough supplied {req.asset}")
@@ -383,7 +467,7 @@ async def borrow(req: TxRequest):
     info = _validate_asset(req.asset)
     if req.amount <= 0:
         raise HTTPException(400, "Amount must be positive")
-    user = await get_or_create_user(req.wallet)
+    user = await load_user_with_accrual(req.wallet, persist=False)
     # Simulate borrow and re-check HF
     new_user = {**user, "borrowed": {**user["borrowed"]}}
     new_user["borrowed"][req.asset] = new_user["borrowed"].get(req.asset, 0.0) + req.amount
@@ -409,7 +493,7 @@ async def repay(req: TxRequest):
     info = _validate_asset(req.asset)
     if req.amount <= 0:
         raise HTTPException(400, "Amount must be positive")
-    user = await get_or_create_user(req.wallet)
+    user = await load_user_with_accrual(req.wallet, persist=False)
     owed = user["borrowed"].get(req.asset, 0.0)
     if owed <= 0:
         raise HTTPException(400, f"No {req.asset} debt to repay")
@@ -555,17 +639,20 @@ async def automation_worker():
                     ASSETS["XLM"]["price"] = round(real, 6)
                     ASSETS["yXLM"]["price"] = round(real * 1.026, 6)
 
-            # Check all users with automation enabled
-            users = await db.users.find({"automation.enabled": True}, {"_id": 0}).to_list(1000)
+            # Accrue interest for ALL users, and run automation for those enabled.
+            users = await db.users.find({}, {"_id": 0}).to_list(1000)
             now_iso = datetime.now(timezone.utc).isoformat()
             for u in users:
-                u["automation"]["last_check"] = now_iso
-                hf = compute_health_factor(u)["health_factor"]
-                trigger = u["automation"]["trigger_hf"]
-                if hf is not None and hf <= trigger:
-                    reason = f"HF={hf:.3f} ≤ trigger={trigger:.3f}"
-                    logger.info("[automation] liquidating %s :: %s", u["wallet"][:10], reason)
-                    await execute_partial_liquidation(u, reason)
+                _accrue_interest(u)
+                automation = u.get("automation") or {}
+                if automation.get("enabled"):
+                    u["automation"]["last_check"] = now_iso
+                    hf = compute_health_factor(u)["health_factor"]
+                    trigger = automation.get("trigger_hf", 1.15)
+                    if hf is not None and hf <= trigger:
+                        reason = f"HF={hf:.3f} ≤ trigger={trigger:.3f}"
+                        logger.info("[automation] liquidating %s :: %s", u["wallet"][:10], reason)
+                        await execute_partial_liquidation(u, reason)
                 await save_user(u)
         except Exception as exc:  # noqa: BLE001
             logger.exception("[automation] tick error: %s", exc)

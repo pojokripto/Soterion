@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { LineChart, Line, ResponsiveContainer } from "recharts";
+import { LineChart, Line } from "recharts";
 import { ArrowUpRight, ArrowDownLeft } from "lucide-react";
 
 export default function MarketsTable({ markets, onSupply, onBorrow }) {
@@ -47,18 +47,16 @@ function Row({ m, onSupply, onBorrow }) {
             <div className="text-[10px] text-muted-foreground sans">{m.name}</div>
           </div>
           <div className="w-16 h-8 ml-2">
-            <ResponsiveContainer>
-              <LineChart data={data}>
-                <Line
-                  type="monotone"
-                  dataKey="v"
-                  stroke={up ? "hsl(var(--terminal-green))" : "hsl(var(--critical-red))"}
-                  strokeWidth={1.5}
-                  dot={false}
-                  isAnimationActive={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <LineChart width={64} height={32} data={data}>
+              <Line
+                type="monotone"
+                dataKey="v"
+                stroke={up ? "hsl(var(--terminal-green))" : "hsl(var(--critical-red))"}
+                strokeWidth={1.5}
+                dot={false}
+                isAnimationActive={false}
+              />
+            </LineChart>
           </div>
         </div>
       </td>

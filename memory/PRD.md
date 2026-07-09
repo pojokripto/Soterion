@@ -17,14 +17,15 @@ Build a DeFi lending and borrowing platform named Soterion on the Stellar blockc
 
 ## Implemented (2026-01)
 - Real-time markets endpoint with price history (30 pt sparklines) & drifting prices; fetches real XLM/USDC close from Stellar Horizon every 30s.
-- Wallet connect (mock/random Stellar-style G-address), position endpoint with per-asset supplied/borrowed/balances.
+- Wallet connect (cryptographic mock Stellar-style G-address via `secrets`), position endpoint with per-asset supplied/borrowed/balances.
 - Full lifecycle: `/api/supply`, `/api/withdraw`, `/api/borrow`, `/api/repay` with LTV / liquidation-threshold / HF checks.
 - Health-factor formula: HF = Σ(collateral × liq_threshold) / Σ(debt).
 - Automation config endpoint (`/api/automation/config`) with `enabled`, `trigger_hf`, `max_liquidation_pct`.
 - Background worker: monitors every user with automation enabled, executes partial liquidation on largest debt vs. largest collateral with liquidation bonus, writes to `db.liquidations` and `db.activity`.
+- **Continuous compound interest accrual** — supplied balances grow at `supply_apy`, borrowed at `borrow_apy` using A = P·eʳᵗ, applied every 6s worker tick and on every read/tx. Cumulative `interest_earned` / `interest_paid` tracked per asset and exposed on the position endpoint + UI.
 - AI Risk Insights endpoint using Emergent LLM key + Claude Sonnet 4.6 with structured 4-section output.
 - Frontend landing page (hero + terminal preview + features + live markets).
-- Dashboard: dramatic radial HF gauge with color zones + trigger marker, MarketsTable with sparklines, PositionSummary, AutomationPanel (toggle + trigger slider + max-cut slider + last-check + CLI vibe), AIInsight terminal panel, ActivityLog (tail-styled), LiquidationHistory table, TxModal with LTV / APY / liq-threshold breakdown.
+- Dashboard: dramatic radial HF gauge with color zones + trigger marker, MarketsTable with fixed-size sparklines (no Recharts console warnings), PositionSummary with per-asset accrual indicators, AutomationPanel, AIInsight terminal panel, ActivityLog, LiquidationHistory, TxModal.
 - 100% backend test pass (15/15), frontend flows verified.
 
 ## Tech decisions
