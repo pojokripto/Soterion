@@ -14,6 +14,7 @@ import logging
 import math
 import os
 import random
+import secrets
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -213,36 +214,48 @@ async def log_activity(wallet: str, kind: str, message: str, meta: Optional[Dict
     await db.activity.insert_one(entry)
 
 
+def _sum_collateral(positions: Dict[str, float]) -> tuple[float, float]:
+    """Return (collateral_usd, weighted_collateral_usd_by_liq_threshold)."""
+    total = 0.0
+    weighted = 0.0
+    for asset, amt in positions.items():
+        info = ASSETS.get(asset)
+        if not info or amt <= 0:
+            continue
+        val = amt * info["price"]
+        total += val
+        weighted += val * info["liquidation_threshold"]
+    return total, weighted
+
+
+def _sum_debt(positions: Dict[str, float]) -> float:
+    total = 0.0
+    for asset, amt in positions.items():
+        info = ASSETS.get(asset)
+        if info and amt > 0:
+            total += amt * info["price"]
+    return total
+
+
+def _max_borrow_usd(supplied: Dict[str, float]) -> float:
+    return sum(
+        supplied.get(a, 0) * ASSETS[a]["price"] * ASSETS[a]["ltv"] for a in ASSETS
+    )
+
+
 def compute_health_factor(user: Dict[str, Any]) -> Dict[str, Any]:
     """
     HF = Σ(collateral_i × liq_threshold_i) / Σ(debt_i)
     HF > 1 → healthy. HF ≤ 1 → liquidatable on-chain.
     """
-    collateral_usd = 0.0
-    weighted_collateral = 0.0
-    debt_usd = 0.0
-    for a, amt in (user.get("supplied") or {}).items():
-        info = ASSETS.get(a)
-        if not info or amt <= 0:
-            continue
-        val = amt * info["price"]
-        collateral_usd += val
-        weighted_collateral += val * info["liquidation_threshold"]
-    for a, amt in (user.get("borrowed") or {}).items():
-        info = ASSETS.get(a)
-        if not info or amt <= 0:
-            continue
-        debt_usd += amt * info["price"]
+    supplied = user.get("supplied") or {}
+    borrowed = user.get("borrowed") or {}
 
-    if debt_usd == 0:
-        hf = math.inf
-    else:
-        hf = weighted_collateral / debt_usd
+    collateral_usd, weighted_collateral = _sum_collateral(supplied)
+    debt_usd = _sum_debt(borrowed)
+    hf = math.inf if debt_usd == 0 else weighted_collateral / debt_usd
+    max_borrow_usd = _max_borrow_usd(supplied)
 
-    max_borrow_usd = sum(
-        (user.get("supplied") or {}).get(a, 0) * ASSETS[a]["price"] * ASSETS[a]["ltv"]
-        for a in ASSETS
-    )
     return {
         "collateral_usd": round(collateral_usd, 2),
         "debt_usd": round(debt_usd, 2),
@@ -293,7 +306,8 @@ async def connect_wallet(req: ConnectWalletRequest):
     if req.address and len(req.address) >= 8:
         addr = _wallet_id(req.address)
     else:
-        addr = "G" + "".join(random.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567") for _ in range(55))
+        alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+        addr = "G" + "".join(secrets.choice(alphabet) for _ in range(55))
     existing = await db.users.find_one({"wallet": addr}, {"_id": 0})
     await get_or_create_user(addr)
     await log_activity(addr, "wallet", f"Wallet {addr[:6]}…{addr[-4:]} connected")

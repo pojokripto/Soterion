@@ -33,9 +33,14 @@ export default function TxModal({ mode, asset, markets, position, onClose, onSub
 
   const submit = async () => {
     setBusy(true);
-    try { await onSubmit(amount); }
-    catch (e) { /* toast handled upstream */ }
-    finally { setBusy(false); }
+    try {
+      await onSubmit(amount);
+    } catch (e) {
+      // Toast is shown upstream; log here for debugging only.
+      if (process.env.NODE_ENV !== "production") console.error("tx submit", e);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const usd = (parseFloat(amount) || 0) * price;

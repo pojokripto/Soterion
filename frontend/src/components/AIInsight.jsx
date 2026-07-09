@@ -43,8 +43,10 @@ export default function AIInsight({ requestAI }) {
               if (lower.startsWith("risk level")) cls = "warn";
               else if (lower.startsWith("recommendation")) cls = "info";
               else if (lower.startsWith("market note")) cls = "ts";
+              // Stable key from content + index prefix; lines can repeat, so include both.
+              const key = `${i}:${line.slice(0, 24)}`;
               return (
-                <div key={i} className={cls}>{line}</div>
+                <div key={key} className={cls}>{line}</div>
               );
             })}
           </pre>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 
 /**
@@ -47,18 +47,18 @@ export default function HealthGauge({ hf, trigger = 1.15, flash }) {
   const zoneGreen = arc(angleFor(1.25), 90, "hsl(var(--terminal-green))", "z-green");
 
   const [display, setDisplay] = useState(0);
+  const displayRef = useRef(0);
   useEffect(() => {
-    if (noDebt) { setDisplay(0); return; }
-    let t;
-    let d = display;
+    if (noDebt) { setDisplay(0); displayRef.current = 0; return undefined; }
+    let raf;
     const step = () => {
-      d += (value - d) * 0.18;
-      setDisplay(d);
-      if (Math.abs(value - d) > 0.005) t = requestAnimationFrame(step);
+      const next = displayRef.current + (value - displayRef.current) * 0.18;
+      displayRef.current = next;
+      setDisplay(next);
+      if (Math.abs(value - next) > 0.005) raf = requestAnimationFrame(step);
     };
-    t = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
   }, [value, noDebt]);
 
   const hfLabel = noDebt ? "∞" : (hf != null ? hf.toFixed(3) : "—");

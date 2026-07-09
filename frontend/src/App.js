@@ -30,11 +30,15 @@ export default function App() {
   const prevHFRef = useRef(null);
   const [hfFlash, setHfFlash] = useState(null); // "up" | "down" | null
 
+  const logErr = (label, err) => {
+    if (process.env.NODE_ENV !== "production") console.error(label, err);
+  };
+
   const fetchMarkets = useCallback(async () => {
     try {
       const { data } = await axios.get(`${API}/markets`);
       setMarkets(data.assets);
-    } catch (e) { console.error(e); }
+    } catch (e) { logErr("markets", e); }
   }, []);
 
   const fetchPosition = useCallback(async (w) => {
@@ -47,7 +51,7 @@ export default function App() {
         else if (data.health_factor < prevHFRef.current) { setHfFlash("down"); setTimeout(() => setHfFlash(null), 800); }
       }
       prevHFRef.current = data.health_factor;
-    } catch (e) { console.error(e); }
+    } catch (e) { logErr("position", e); }
   }, []);
 
   const fetchActivity = useCallback(async (w) => {
@@ -59,7 +63,7 @@ export default function App() {
       ]);
       setActivity(a.data.activity);
       setLiquidations(l.data.liquidations);
-    } catch (e) { console.error(e); }
+    } catch (e) { logErr("activity", e); }
   }, []);
 
   // Poll markets every 6s

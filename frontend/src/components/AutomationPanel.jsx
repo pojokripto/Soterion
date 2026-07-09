@@ -3,18 +3,18 @@ import { Cpu, Zap } from "lucide-react";
 
 export default function AutomationPanel({ position, onUpdate }) {
   const auto = position?.automation ?? { enabled: false, trigger_hf: 1.15, max_liquidation_pct: 0.35 };
-  const [enabled, setEnabled] = useState(auto.enabled);
-  const [trigger, setTrigger] = useState(auto.trigger_hf);
-  const [maxPct, setMaxPct] = useState(auto.max_liquidation_pct);
+  const { enabled: autoEnabled, trigger_hf: autoTrigger, max_liquidation_pct: autoMax } = auto;
+  const [enabled, setEnabled] = useState(autoEnabled);
+  const [trigger, setTrigger] = useState(autoTrigger);
+  const [maxPct, setMaxPct] = useState(autoMax);
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
-    setEnabled(auto.enabled);
-    setTrigger(auto.trigger_hf);
-    setMaxPct(auto.max_liquidation_pct);
+    setEnabled(autoEnabled);
+    setTrigger(autoTrigger);
+    setMaxPct(autoMax);
     setDirty(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auto.enabled, auto.trigger_hf, auto.max_liquidation_pct]);
+  }, [autoEnabled, autoTrigger, autoMax]);
 
   const dirtyFlag = () => setDirty(true);
 
