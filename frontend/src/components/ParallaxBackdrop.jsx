@@ -17,14 +17,14 @@ import { XLMLogo, USDCLogo, AQUALogo, YXLMLogo } from "@/components/AssetLogos";
 // (higher = moves more with the cursor). We pick a spread that keeps logos in view
 // on typical viewports and avoids the central content column.
 const NODES = [
-  { Comp: SoterionLogo,  size: 220, x: "-42vw", y: "-22vh", depth: 0.9, opacity: 0.09, rotate: -6 },
-  { Comp: SoterionLogo,  size: 140, x:  "40vw", y:  "26vh", depth: 1.6, opacity: 0.08, rotate: 12 },
-  { Comp: XLMLogo,       size:  84, x: "-34vw", y:  "22vh", depth: 1.2, opacity: 0.35, rotate:  0 },
-  { Comp: USDCLogo,      size:  70, x:  "36vw", y: "-24vh", depth: 1.0, opacity: 0.32, rotate:  4 },
-  { Comp: AQUALogo,      size:  62, x: "-18vw", y: "-32vh", depth: 1.9, opacity: 0.30, rotate: -8 },
-  { Comp: YXLMLogo,      size:  56, x:  "22vw", y:  "34vh", depth: 2.1, opacity: 0.28, rotate: 10 },
-  { Comp: XLMLogo,       size:  46, x:  "48vw", y:   "2vh", depth: 2.4, opacity: 0.22, rotate: -4 },
-  { Comp: AQUALogo,      size:  40, x: "-48vw", y:   "4vh", depth: 2.6, opacity: 0.22, rotate:  6 },
+  { id: "sot-lg-l",  Comp: SoterionLogo, size: 220, x: "-42vw", y: "-22vh", depth: 0.9, opacity: 0.09, rotate: -6 },
+  { id: "sot-lg-r",  Comp: SoterionLogo, size: 140, x:  "40vw", y:  "26vh", depth: 1.6, opacity: 0.08, rotate: 12 },
+  { id: "xlm-bl",    Comp: XLMLogo,      size:  84, x: "-34vw", y:  "22vh", depth: 1.2, opacity: 0.35, rotate:  0 },
+  { id: "usdc-tr",   Comp: USDCLogo,     size:  70, x:  "36vw", y: "-24vh", depth: 1.0, opacity: 0.32, rotate:  4 },
+  { id: "aqua-tl",   Comp: AQUALogo,     size:  62, x: "-18vw", y: "-32vh", depth: 1.9, opacity: 0.30, rotate: -8 },
+  { id: "yxlm-br",   Comp: YXLMLogo,     size:  56, x:  "22vw", y:  "34vh", depth: 2.1, opacity: 0.28, rotate: 10 },
+  { id: "xlm-far-r", Comp: XLMLogo,      size:  46, x:  "48vw", y:   "2vh", depth: 2.4, opacity: 0.22, rotate: -4 },
+  { id: "aqua-far-l",Comp: AQUALogo,     size:  40, x: "-48vw", y:   "4vh", depth: 2.6, opacity: 0.22, rotate:  6 },
 ];
 
 // Physics: soft, floaty spring – reads as background parallax, not follow-cursor.
@@ -59,8 +59,8 @@ export default function ParallaxBackdrop() {
         }}
       />
       <div className="absolute left-1/2 top-1/2 w-0 h-0">
-        {NODES.map((n, i) => (
-          <ParallaxNode key={i} node={n} sx={sx} sy={sy} />
+        {NODES.map((n) => (
+          <ParallaxNode key={n.id} node={n} sx={sx} sy={sy} />
         ))}
       </div>
     </div>

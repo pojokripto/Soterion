@@ -53,46 +53,31 @@ export default function AutomationPanel({ position, onUpdate }) {
       </div>
 
       <div className="mt-4 space-y-4">
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <span className="section-label text-[10px]">Trigger HF</span>
-            <span className="mono text-[12px] text-steel" data-testid="trigger-value">{Number(trigger).toFixed(2)}</span>
-          </div>
-          <input
-            type="range"
-            min="1.00"
-            max="2.00"
-            step="0.01"
-            value={trigger}
-            onChange={(e) => { setTrigger(parseFloat(e.target.value)); dirtyFlag(); }}
-            className="slider"
-            data-testid="trigger-slider"
-          />
-          <div className="flex justify-between mono text-[9px] text-muted-foreground mt-1">
-            <span>1.00 liquidatable</span>
-            <span>2.00 safe</span>
-          </div>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <span className="section-label text-[10px]">Max Cut per Trigger</span>
-            <span className="mono text-[12px] text-amber" data-testid="max-pct-value">{Math.round(maxPct * 100)}%</span>
-          </div>
-          <input
-            type="range"
-            min="0.05"
-            max="0.75"
-            step="0.05"
-            value={maxPct}
-            onChange={(e) => { setMaxPct(parseFloat(e.target.value)); dirtyFlag(); }}
-            className="slider"
-            data-testid="maxpct-slider"
-          />
-        </div>
+        <SliderRow
+          label="Trigger HF"
+          value={trigger}
+          displayValue={Number(trigger).toFixed(2)}
+          displayColor="steel"
+          min="1.00" max="2.00" step="0.01"
+          onChange={(v) => { setTrigger(v); dirtyFlag(); }}
+          sliderTestId="trigger-slider"
+          valueTestId="trigger-value"
+          minLabel="1.00 liquidatable"
+          maxLabel="2.00 safe"
+        />
+        <SliderRow
+          label="Max Cut per Trigger"
+          value={maxPct}
+          displayValue={`${Math.round(maxPct * 100)}%`}
+          displayColor="amber"
+          min="0.05" max="0.75" step="0.05"
+          onChange={(v) => { setMaxPct(v); dirtyFlag(); }}
+          sliderTestId="maxpct-slider"
+          valueTestId="max-pct-value"
+        />
       </div>
 
-      <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
+      <div className="mt-4 pt-4 border-t border-white/[0.06] flex items-center justify-between">
         <div className="mono text-[10.5px] text-muted-foreground">
           last check <span className="text-foreground">{lastCheck}</span>
         </div>
@@ -108,3 +93,36 @@ export default function AutomationPanel({ position, onUpdate }) {
     </div>
   );
 }
+
+function SliderRow({
+  label, value, displayValue, displayColor,
+  min, max, step, onChange,
+  sliderTestId, valueTestId,
+  minLabel, maxLabel,
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <span className="section-label text-[10px]">{label}</span>
+        <span className={`mono text-[12px] text-${displayColor}`} data-testid={valueTestId}>{displayValue}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className="slider"
+        data-testid={sliderTestId}
+      />
+      {(minLabel || maxLabel) && (
+        <div className="flex justify-between mono text-[9px] text-muted-foreground mt-1">
+          <span>{minLabel}</span>
+          <span>{maxLabel}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
