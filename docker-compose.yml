@@ -1,0 +1,53 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: soterion-be
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8001:8001"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - soterion-global
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: soterion-fe
+    env_file:
+      - ./frontend/.env
+    ports:
+      - "3001:80"
+    depends_on:
+      - backend
+    networks:
+      - soterion-global
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    hostname: mongo
+    container_name: soterion-db
+    env_file:
+      - ./backend/.env
+    volumes:
+      - soterion-db-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - soterion-global
+    restart: unless-stopped
+
+volumes:
+  soterion-db-data:
+
+networks:
+  soterion-global:
+    external: true
